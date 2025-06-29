@@ -1,5 +1,4 @@
-# .gitignoreファイルを作成
-echo "# Python
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -30,4 +29,8 @@ Thumbs.db
 
 # Temporary files
 *.tmp
-*.temp" > .gitignore
+*.temp
+
+# Excel files (unless specifically needed)
+*.xlsx
+*.xls

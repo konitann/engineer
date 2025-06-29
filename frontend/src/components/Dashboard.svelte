@@ -1,4 +1,542 @@
-<script>
+<style>
+  .dashboard {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #eee;
+  }
+
+  .user-info h2 {
+    margin: 0;
+    color: #333;
+  }
+
+  .user-info p {
+    margin: 5px 0;
+    color: #666;
+  }
+
+  .company {
+    font-style: italic;
+    color: #888;
+  }
+
+  .logout-btn {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .logout-btn:hover {
+    background-color: #c82333;
+  }
+
+  .message {
+    padding: 12px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+  }
+
+  .message.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+  }
+
+  .message.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+  }
+
+  section {
+    margin-bottom: 40px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+  }
+
+  h3 {
+    margin-top: 0;
+    color: #495057;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 10px;
+  }
+
+  h4 {
+    color: #6c757d;
+    margin-bottom: 15px;
+  }
+
+  .init-section {
+    background-color: #fff3cd;
+    border-color: #ffeaa7;
+  }
+
+  .init-btn {
+    background-color: #ffc107;
+    color: #212529;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+
+  .init-btn:hover {
+    background-color: #e0a800;
+  }
+
+  .warning {
+    margin-top: 10px;
+    color: #856404;
+    font-size: 14px;
+    font-style: italic;
+  }
+
+  .form-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+    gap: 10px;
+  }
+
+  .form-row label {
+    min-width: 80px;
+    font-weight: bold;
+    color: #495057;
+  }
+
+  .form-row input,
+  .form-row select,
+  .form-row textarea {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+
+  .form-row textarea {
+    min-height: 80px;
+    resize: vertical;
+  }
+
+  .form-row button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .form-row button:hover {
+    background-color: #0056b3;
+  }
+
+  .subjects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+  }
+
+  .subject-card {
+    background-color: white;
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .subject-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    transform: translateY(-2px);
+    border-color: #007bff;
+  }
+
+  .clickable-title {
+    margin: 0 0 8px 0;
+    color: #007bff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .click-hint {
+    font-size: 12px;
+    color: #6c757d;
+    font-weight: normal;
+  }
+
+  .subject-card p.time {
+    margin: 0 0 8px 0;
+    color: #6c757d;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .subject-card p.teacher {
+    margin: 0 0 5px 0;
+    color: #28a745;
+    font-size: 13px;
+  }
+
+  .subject-card p.department {
+    margin: 0 0 8px 0;
+    color: #17a2b8;
+    font-size: 13px;
+  }
+
+  .subject-card p.description {
+    margin: 0;
+    color: #868e96;
+    font-size: 12px;
+    font-style: italic;
+    line-height: 1.4;
+  }
+
+  .import-section {
+    background-color: #e3f2fd;
+    border: 1px solid #bbdefb;
+    border-radius: 6px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  .import-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+  }
+
+  .file-select-btn {
+    background-color: #2196f3;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .file-select-btn:hover {
+    background-color: #1976d2;
+  }
+
+  .import-btn {
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .import-btn:hover:not(:disabled) {
+    background-color: #45a049;
+  }
+
+  .import-btn:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+  }
+
+  .template-btn {
+    background-color: #ff9800;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .template-btn:hover {
+    background-color: #f57c00;
+  }
+
+  .file-info {
+    color: #1976d2;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .import-info {
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    padding: 15px;
+  }
+
+  .import-info ul {
+    margin: 10px 0 0 20px;
+    color: #6c757d;
+  }
+
+  .import-info li {
+    margin-bottom: 5px;
+  }
+
+  .qr-result {
+    margin-top: 20px;
+    text-align: center;
+    background-color: white;
+    padding: 20px;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+  }
+
+  .qr-result img {
+    margin: 10px 0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+  }
+
+  .table-container {
+    background-color: white;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #dee2e6;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th,
+  td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #dee2e6;
+  }
+
+  th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+    color: #495057;
+  }
+
+  tr:hover {
+    background-color: #f5f5f5;
+  }
+
+  .status-出勤 {
+    color: #28a745;
+    font-weight: bold;
+  }
+
+  .status-欠勤 {
+    color: #dc3545;
+    font-weight: bold;
+  }
+
+  .status-遅刻 {
+    color: #ffc107;
+    font-weight: bold;
+  }
+
+  .status-早退 {
+    color: #fd7e14;
+    font-weight: bold;
+  }
+
+  .history-tabs {
+    margin-top: 20px;
+  }
+
+  .tab-content {
+    margin-bottom: 30px;
+  }
+
+  /* モーダルスタイル */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+
+  .modal-content {
+    background-color: white;
+    border-radius: 8px;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    width: 90%;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #dee2e6;
+    background-color: #f8f9fa;
+    border-radius: 8px 8px 0 0;
+  }
+
+  .modal-header h3 {
+    margin: 0;
+    color: #495057;
+    border: none;
+    padding: 0;
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #6c757d;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .close-btn:hover {
+    color: #495057;
+  }
+
+  .modal-body {
+    padding: 20px;
+  }
+
+  .subject-details {
+    space-y: 20px;
+  }
+
+  .detail-group {
+    margin-bottom: 25px;
+  }
+
+  .detail-group h4 {
+    color: #007bff;
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 8px;
+    margin-bottom: 15px;
+  }
+
+  .detail-item {
+    margin-bottom: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f8f9fa;
+  }
+
+  .detail-item strong {
+    color: #495057;
+    margin-right: 10px;
+    min-width: 100px;
+    display: inline-block;
+  }
+
+  .schedule-table {
+    margin-top: 10px;
+  }
+
+  .schedule-table table {
+    background-color: #f8f9fa;
+    border-radius: 4px;
+  }
+
+  .schedule-table th {
+    background-color: #e9ecef;
+  }
+
+  .excel-data {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 15px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .excel-data pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #495057;
+  }
+
+  @media (max-width: 768px) {
+    .dashboard {
+      padding: 10px;
+    }
+
+    header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .form-row {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .form-row label {
+      min-width: auto;
+      margin-bottom: 5px;
+    }
+
+    .subjects-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .table-container {
+      overflow-x: auto;
+    }
+
+    .modal-content {
+      width: 95%;
+      max-width: none;
+    }
+
+    .modal-header {
+      padding: 15px;
+    }
+
+    .modal-body {
+      padding: 15px;
+    }
+
+    .click-hint {
+      display: none;
+    }
+  }
+</style><script>
   import { createEventDispatcher, onMount } from 'svelte';
   
   const dispatch = createEventDispatcher();
@@ -31,6 +569,10 @@
   let fileInput;
   let selectedFile = null;
   let importing = false;
+
+  // 科目詳細表示用
+  let selectedSubjectDetail = null;
+  let showSubjectModal = false;
 
   onMount(() => {
     loadSubjects();
@@ -116,6 +658,31 @@
       console.error('Create subject error:', err);
       error = `接続に失敗しました: ${err.message}`;
     }
+  }
+
+  async function showSubjectDetail(subjectId) {
+    try {
+      const response = await fetch(`http://localhost:5000/api/subjects/${subjectId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        selectedSubjectDetail = await response.json();
+        showSubjectModal = true;
+      } else {
+        error = '科目詳細の取得に失敗しました';
+      }
+    } catch (err) {
+      console.error('Subject detail error:', err);
+      error = `科目詳細の取得に失敗しました: ${err.message}`;
+    }
+  }
+
+  function closeSubjectModal() {
+    showSubjectModal = false;
+    selectedSubjectDetail = null;
   }
 
   function handleFileSelect(event) {
@@ -359,6 +926,16 @@
     message = '';
     error = '';
   }
+
+  function formatExcelData(excelDataStr) {
+    try {
+      // 文字列をオブジェクトに変換
+      const excelData = eval('(' + excelDataStr + ')');
+      return excelData;
+    } catch (e) {
+      return null;
+    }
+  }
 </script>
 
 <div class="dashboard">
@@ -449,9 +1026,18 @@
       {#if subjects.length > 0}
         <div class="subjects-grid">
           {#each subjects as subject}
-            <div class="subject-card">
-              <h5>{subject.name}</h5>
+            <div class="subject-card" on:click={() => showSubjectDetail(subject.id)}>
+              <h5 class="clickable-title">
+                {subject.name}
+                <span class="click-hint">👁️ 詳細を見る</span>
+              </h5>
               <p class="time">{subject.attendance_time}</p>
+              {#if subject.teacher_name}
+                <p class="teacher">担当: {subject.teacher_name}</p>
+              {/if}
+              {#if subject.department}
+                <p class="department">所属: {subject.department}</p>
+              {/if}
               {#if subject.description}
                 <p class="description">{subject.description}</p>
               {/if}
@@ -641,374 +1227,87 @@
   </section>
 </div>
 
-<style>
-  .dashboard {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
-  }
+<!-- 科目詳細モーダル -->
+{#if showSubjectModal && selectedSubjectDetail}
+  <div class="modal-overlay" on:click={closeSubjectModal}>
+    <div class="modal-content" on:click|stopPropagation>
+      <div class="modal-header">
+        <h3>{selectedSubjectDetail.name} - 詳細情報</h3>
+        <button class="close-btn" on:click={closeSubjectModal}>×</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="subject-details">
+          <div class="detail-group">
+            <h4>基本情報</h4>
+            <div class="detail-item">
+              <strong>科目名:</strong> {selectedSubjectDetail.name}
+            </div>
+            {#if selectedSubjectDetail.teacher_name}
+              <div class="detail-item">
+                <strong>担当者:</strong> {selectedSubjectDetail.teacher_name}
+              </div>
+            {/if}
+            {#if selectedSubjectDetail.department}
+              <div class="detail-item">
+                <strong>所属:</strong> {selectedSubjectDetail.department}
+              </div>
+            {/if}
+            {#if selectedSubjectDetail.attendance_time}
+              <div class="detail-item">
+                <strong>授業時間:</strong> {selectedSubjectDetail.attendance_time}
+              </div>
+            {/if}
+            {#if selectedSubjectDetail.credits}
+              <div class="detail-item">
+                <strong>単位数:</strong> {selectedSubjectDetail.credits}
+              </div>
+            {/if}
+            {#if selectedSubjectDetail.description}
+              <div class="detail-item">
+                <strong>説明:</strong> {selectedSubjectDetail.description}
+              </div>
+            {/if}
+          </div>
 
-  header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 30px;
-    padding-bottom: 20px;
-    border-bottom: 2px solid #eee;
-  }
+          {#if selectedSubjectDetail.schedules && selectedSubjectDetail.schedules.length > 0}
+            <div class="detail-group">
+              <h4>スケジュール</h4>
+              <div class="schedule-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>日付</th>
+                      <th>時間数</th>
+                      <th>場所</th>
+                      <th>備考</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each selectedSubjectDetail.schedules as schedule}
+                      <tr>
+                        <td>{schedule.date || '-'}</td>
+                        <td>{schedule.hours || '-'}</td>
+                        <td>{schedule.location || '-'}</td>
+                        <td>{schedule.notes || '-'}</td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          {/if}
 
-  .user-info h2 {
-    margin: 0;
-    color: #333;
-  }
-
-  .user-info p {
-    margin: 5px 0;
-    color: #666;
-  }
-
-  .company {
-    font-style: italic;
-    color: #888;
-  }
-
-  .logout-btn {
-    background-color: #dc3545;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-
-  .logout-btn:hover {
-    background-color: #c82333;
-  }
-
-  .message {
-    padding: 12px;
-    border-radius: 4px;
-    margin-bottom: 20px;
-  }
-
-  .message.success {
-    background-color: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
-  }
-
-  .message.error {
-    background-color: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
-  }
-
-  section {
-    margin-bottom: 40px;
-    padding: 20px;
-    background-color: #f8f9fa;
-    border-radius: 8px;
-    border: 1px solid #e9ecef;
-  }
-
-  h3 {
-    margin-top: 0;
-    color: #495057;
-    border-bottom: 2px solid #007bff;
-    padding-bottom: 10px;
-  }
-
-  h4 {
-    color: #6c757d;
-    margin-bottom: 15px;
-  }
-
-  .init-section {
-    background-color: #fff3cd;
-    border-color: #ffeaa7;
-  }
-
-  .init-btn {
-    background-color: #ffc107;
-    color: #212529;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-  }
-
-  .init-btn:hover {
-    background-color: #e0a800;
-  }
-
-  .warning {
-    margin-top: 10px;
-    color: #856404;
-    font-size: 14px;
-    font-style: italic;
-  }
-
-  .form-row {
-    display: flex;
-    align-items: center;
-    margin-bottom: 15px;
-    gap: 10px;
-  }
-
-  .form-row label {
-    min-width: 80px;
-    font-weight: bold;
-    color: #495057;
-  }
-
-  .form-row input,
-  .form-row select,
-  .form-row textarea {
-    flex: 1;
-    padding: 8px 12px;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
-    font-size: 14px;
-  }
-
-  .form-row textarea {
-    min-height: 80px;
-    resize: vertical;
-  }
-
-  .form-row button {
-    background-color: #007bff;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-
-  .form-row button:hover {
-    background-color: #0056b3;
-  }
-
-  .subjects-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 15px;
-    margin-top: 15px;
-  }
-
-  .subject-card {
-    background-color: white;
-    padding: 15px;
-    border-radius: 6px;
-    border: 1px solid #dee2e6;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  }
-
-  .subject-card h5 {
-    margin: 0 0 8px 0;
-    color: #007bff;
-  }
-
-  .subject-card p.time {
-    margin: 0 0 8px 0;
-    color: #6c757d;
-    font-size: 14px;
-    font-weight: 500;
-  }
-
-  .subject-card p.description {
-    margin: 0;
-    color: #868e96;
-    font-size: 12px;
-    font-style: italic;
-    line-height: 1.4;
-  }
-
-  .import-section {
-    background-color: #e3f2fd;
-    border: 1px solid #bbdefb;
-    border-radius: 6px;
-    padding: 20px;
-    margin-bottom: 20px;
-  }
-
-  .import-controls {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    margin-bottom: 15px;
-    flex-wrap: wrap;
-  }
-
-  .file-select-btn {
-    background-color: #2196f3;
-    color: white;
-    border: none;
-    padding: 10px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-  }
-
-  .file-select-btn:hover {
-    background-color: #1976d2;
-  }
-
-  .import-btn {
-    background-color: #4caf50;
-    color: white;
-    border: none;
-    padding: 10px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-  }
-
-  .import-btn:hover:not(:disabled) {
-    background-color: #45a049;
-  }
-
-  .import-btn:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-  }
-
-  .template-btn {
-    background-color: #ff9800;
-    color: white;
-    border: none;
-    padding: 10px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-  }
-
-  .template-btn:hover {
-    background-color: #f57c00;
-  }
-
-  .file-info {
-    color: #1976d2;
-    font-size: 14px;
-    font-weight: 500;
-  }
-
-  .import-info {
-    background-color: #f8f9fa;
-    border-radius: 4px;
-    padding: 15px;
-  }
-
-  .import-info ul {
-    margin: 10px 0 0 20px;
-    color: #6c757d;
-  }
-
-  .import-info li {
-    margin-bottom: 5px;
-  }
-
-  .qr-result {
-    margin-top: 20px;
-    text-align: center;
-    background-color: white;
-    padding: 20px;
-    border-radius: 6px;
-    border: 1px solid #dee2e6;
-  }
-
-  .qr-result img {
-    margin: 10px 0;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-  }
-
-  .table-container {
-    background-color: white;
-    border-radius: 6px;
-    overflow: hidden;
-    border: 1px solid #dee2e6;
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-
-  th,
-  td {
-    padding: 12px;
-    text-align: left;
-    border-bottom: 1px solid #dee2e6;
-  }
-
-  th {
-    background-color: #f8f9fa;
-    font-weight: bold;
-    color: #495057;
-  }
-
-  tr:hover {
-    background-color: #f5f5f5;
-  }
-
-  .status-出勤 {
-    color: #28a745;
-    font-weight: bold;
-  }
-
-  .status-欠勤 {
-    color: #dc3545;
-    font-weight: bold;
-  }
-
-  .status-遅刻 {
-    color: #ffc107;
-    font-weight: bold;
-  }
-
-  .status-早退 {
-    color: #fd7e14;
-    font-weight: bold;
-  }
-
-  .history-tabs {
-    margin-top: 20px;
-  }
-
-  .tab-content {
-    margin-bottom: 30px;
-  }
-
-  @media (max-width: 768px) {
-    .dashboard {
-      padding: 10px;
-    }
-
-    header {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 10px;
-    }
-
-    .form-row {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-
-    .form-row label {
-      min-width: auto;
-      margin-bottom: 5px;
-    }
-
-    .subjects-grid {
-      grid-template-columns: 1fr;
-    }
-    
-    .table-container {
-      overflow-x: auto;
-    }
-  }
-</style>
+          {#if selectedSubjectDetail.excel_data}
+            <div class="detail-group">
+              <h4>インポートされたエクセルデータ</h4>
+              <div class="excel-data">
+                <pre>{selectedSubjectDetail.excel_data}</pre>
+              </div>
+            </div>
+          {/if}
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
