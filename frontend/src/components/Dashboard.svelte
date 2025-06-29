@@ -26,6 +26,11 @@
   // 新しい科目追加用
   let newSubjectName = '';
   let newSubjectTime = '';
+  
+  // エクセルインポート用
+  let fileInput;
+  let selectedFile = null;
+  let importing = false;
 
   onMount(() => {
     loadSubjects();
@@ -110,6 +115,83 @@
     } catch (err) {
       console.error('Create subject error:', err);
       error = `接続に失敗しました: ${err.message}`;
+    }
+  }
+
+  function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (file) {
+      selectedFile = file;
+      clearMessages();
+    }
+  }
+
+  async function importExcelFile() {
+    if (!selectedFile) {
+      error = 'ファイルを選択してください';
+      return;
+    }
+
+    importing = true;
+    error = '';
+    message = '';
+
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      const response = await fetch('http://localhost:5000/api/import-excel', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        message = `インポート完了: ${data.subjects_created}個の科目、${data.schedules_created}個のスケジュールを処理しました`;
+        selectedFile = null;
+        fileInput.value = '';
+        loadSubjects();
+      } else {
+        error = data.error || 'インポートに失敗しました';
+      }
+    } catch (err) {
+      console.error('Import error:', err);
+      error = `インポートに失敗しました: ${err.message}`;
+    } finally {
+      importing = false;
+    }
+  }
+
+  async function downloadTemplate() {
+    try {
+      const response = await fetch('http://localhost:5000/api/download-template', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'attendance_template.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        message = 'テンプレートファイルをダウンロードしました';
+      } else {
+        error = 'テンプレートダウンロードに失敗しました';
+      }
+    } catch (err) {
+      console.error('Template download error:', err);
+      error = `ダウンロードに失敗しました: ${err.message}`;
     }
   }
 
@@ -308,8 +390,43 @@
   <section class="subjects-section">
     <h3>科目管理</h3>
     
+    <div class="import-section">
+      <h4>エクセルファイルから科目をインポート</h4>
+      <div class="import-controls">
+        <input
+          type="file"
+          accept=".xlsx,.xls"
+          bind:this={fileInput}
+          on:change={handleFileSelect}
+          style="display: none;"
+        />
+        <button class="file-select-btn" on:click={() => fileInput.click()}>
+          📁 エクセルファイルを選択
+        </button>
+        
+        {#if selectedFile}
+          <span class="file-info">選択されたファイル: {selectedFile.name}</span>
+          <button class="import-btn" on:click={importExcelFile} disabled={importing}>
+            {importing ? 'インポート中...' : '📊 インポート実行'}
+          </button>
+        {/if}
+        
+        <button class="template-btn" on:click={downloadTemplate}>
+          📄 テンプレートダウンロード
+        </button>
+      </div>
+      
+      <div class="import-info">
+        <p><strong>インポート対象:</strong></p>
+        <ul>
+          <li>Sheet1: 科目基本情報（科目名、授業時間、担当者など）</li>
+          <li>Sheet2: 出勤スケジュール（出講日、時間数など）</li>
+        </ul>
+      </div>
+    </div>
+    
     <div class="add-subject">
-      <h4>新しい科目を追加</h4>
+      <h4>新しい科目を手動追加</h4>
       <div class="form-row">
         <input
           type="text"
@@ -334,7 +451,10 @@
           {#each subjects as subject}
             <div class="subject-card">
               <h5>{subject.name}</h5>
-              <p>{subject.attendance_time}</p>
+              <p class="time">{subject.attendance_time}</p>
+              {#if subject.description}
+                <p class="description">{subject.description}</p>
+              {/if}
             </div>
           {/each}
         </div>
@@ -691,10 +811,103 @@
     color: #007bff;
   }
 
-  .subject-card p {
-    margin: 0;
+  .subject-card p.time {
+    margin: 0 0 8px 0;
     color: #6c757d;
     font-size: 14px;
+    font-weight: 500;
+  }
+
+  .subject-card p.description {
+    margin: 0;
+    color: #868e96;
+    font-size: 12px;
+    font-style: italic;
+    line-height: 1.4;
+  }
+
+  .import-section {
+    background-color: #e3f2fd;
+    border: 1px solid #bbdefb;
+    border-radius: 6px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  .import-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+  }
+
+  .file-select-btn {
+    background-color: #2196f3;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .file-select-btn:hover {
+    background-color: #1976d2;
+  }
+
+  .import-btn {
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .import-btn:hover:not(:disabled) {
+    background-color: #45a049;
+  }
+
+  .import-btn:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+  }
+
+  .template-btn {
+    background-color: #ff9800;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .template-btn:hover {
+    background-color: #f57c00;
+  }
+
+  .file-info {
+    color: #1976d2;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .import-info {
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    padding: 15px;
+  }
+
+  .import-info ul {
+    margin: 10px 0 0 20px;
+    color: #6c757d;
+  }
+
+  .import-info li {
+    margin-bottom: 5px;
   }
 
   .qr-result {

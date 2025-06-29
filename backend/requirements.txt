@@ -1,3 +1,4 @@
+# 基本依存関係（必須）
 Flask==2.3.3
 Flask-SQLAlchemy==3.0.5
 Flask-CORS==4.0.0
@@ -5,3 +6,7 @@ Flask-JWT-Extended==4.5.3
 qrcode==7.4.2
 Pillow==10.0.1
 bcrypt==4.0.1
+
+# エクセルインポート機能用（オプション）
+# 以下は手動でインストールしてください:
+# pip install pandas==2.0.3 openpyxl==3.1.2

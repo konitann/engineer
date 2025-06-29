@@ -1,7 +1,8 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from sqlalchemy import text  # 追加
 import bcrypt
 import qrcode
 import io
@@ -10,7 +11,9 @@ from datetime import datetime, date, timedelta
 import os
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///attendance.db'
+
+# データベースのパスを修正（日本語パス対応）
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///attendance.db'  # シンプルなパスに変更
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = 'your-secret-key-change-in-production'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
@@ -21,21 +24,21 @@ jwt = JWTManager(app)
 # CORS設定
 CORS(app, resources={r"/api/*": {"origins": ["http://localhost:3000", "http://localhost:5173"]}})
 
-# 新しいデータベースモデル
+# データベースモデル
 class User(db.Model):
     __tablename__ = 'user'
     
-    user_id = db.Column(db.Integer, primary_key=True)  # PK: UserID
-    user_name = db.Column(db.String(80), unique=True, nullable=False)  # User名
-    password = db.Column(db.String(128), nullable=False)  # パスワード
-    email = db.Column(db.String(120), unique=True, nullable=False)  # メール
-    user_info = db.Column(db.Text)  # User情報
-    company_dept_club = db.Column(db.String(200))  # 会社(非営利のクラブ想定)
+    user_id = db.Column(db.Integer, primary_key=True)
+    user_name = db.Column(db.String(80), unique=True, nullable=False)
+    password = db.Column(db.String(128), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    user_info = db.Column(db.Text)
+    company_dept_club = db.Column(db.String(200))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # リレーションシップ
     attendances = db.relationship('Attendance', backref='user', lazy=True)
-    exceptions = db.relationship('Exception', backref='user', lazy=True)
+    exceptions = db.relationship('ExceptionRecord', backref='user', lazy=True)
     
     def set_password(self, password):
         self.password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -46,9 +49,10 @@ class User(db.Model):
 class Subject(db.Model):
     __tablename__ = 'subject'
     
-    subject_id = db.Column(db.Integer, primary_key=True)  # PK: 科目ID
-    subject_name = db.Column(db.String(100), nullable=False)  # 科目名
-    attendance_time = db.Column(db.String(50))  # 授業時間(while)
+    subject_id = db.Column(db.Integer, primary_key=True)
+    subject_name = db.Column(db.String(100), nullable=False)
+    attendance_time = db.Column(db.String(50))
+    description = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # リレーションシップ
@@ -57,28 +61,56 @@ class Subject(db.Model):
 class Attendance(db.Model):
     __tablename__ = 'attendance'
     
-    attendance_id = db.Column(db.Integer, primary_key=True)  # PK: 勤務ID
-    user_id = db.Column(db.Integer, db.ForeignKey('user.user_id'), nullable=False)  # FK: UserID
-    subject_id = db.Column(db.Integer, db.ForeignKey('subject.subject_id'), nullable=False)  # FK: 科目ID
-    date = db.Column(db.Date, nullable=False)  # 日付
-    attendance_status = db.Column(db.String(20), nullable=False)  # 出勤したかどうか
-    attendance_time = db.Column(db.Text)  # 出勤対象
+    attendance_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.user_id'), nullable=False)
+    subject_id = db.Column(db.Integer, db.ForeignKey('subject.subject_id'), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    attendance_status = db.Column(db.String(20), nullable=False)
+    attendance_time = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-class Exception(db.Model):
+class ExceptionRecord(db.Model):
     __tablename__ = 'exception'
     
-    exception_id = db.Column(db.Integer, primary_key=True)  # PK: 名目
-    user_id = db.Column(db.Integer, db.ForeignKey('user.user_id'), nullable=False)  # FK: UserID
-    date = db.Column(db.Date, nullable=False)  # 日付
-    reason = db.Column(db.Text)  # 理由
-    notes = db.Column(db.Text)  # 備考
+    exception_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.user_id'), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    reason = db.Column(db.Text)
+    notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 # Health check route
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    return jsonify({'status': 'ok'}), 200
+    try:
+        # データベース接続テスト
+        db.session.execute(text('SELECT 1'))
+        
+        # オプションライブラリの確認
+        optional_libs = {}
+        try:
+            import pandas
+            optional_libs['pandas'] = 'available'
+        except ImportError:
+            optional_libs['pandas'] = 'not installed'
+        
+        try:
+            import openpyxl
+            optional_libs['openpyxl'] = 'available'
+        except ImportError:
+            optional_libs['openpyxl'] = 'not installed'
+        
+        return jsonify({
+            'status': 'ok',
+            'database': 'connected',
+            'optional_libraries': optional_libs,
+            'excel_import': 'available' if all(lib == 'available' for lib in optional_libs.values()) else 'disabled'
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
 
 # Error handlers
 @jwt.expired_token_loader
@@ -198,7 +230,8 @@ def get_subjects():
             result.append({
                 'id': subject.subject_id,
                 'name': subject.subject_name,
-                'attendance_time': subject.attendance_time
+                'attendance_time': subject.attendance_time,
+                'description': subject.description or ''
             })
         return jsonify(result), 200
     except Exception as e:
@@ -212,13 +245,15 @@ def create_subject():
         data = request.get_json()
         subject_name = data.get('name')
         attendance_time = data.get('attendance_time', '')
+        description = data.get('description', '')
         
         if not subject_name:
             return jsonify({'error': 'Subject name is required'}), 400
         
         subject = Subject(
             subject_name=subject_name,
-            attendance_time=attendance_time
+            attendance_time=attendance_time,
+            description=description
         )
         
         db.session.add(subject)
@@ -297,7 +332,6 @@ def get_attendance():
         print(f"Get attendance error: {e}")
         return jsonify({'error': 'Failed to get attendance'}), 500
 
-# 例外記録
 @app.route('/api/exceptions', methods=['POST'])
 @jwt_required()
 def create_exception():
@@ -309,14 +343,14 @@ def create_exception():
         reason = data.get('reason', '')
         notes = data.get('notes', '')
         
-        exception = Exception(
+        exception_record = ExceptionRecord(
             user_id=user_id,
             date=datetime.strptime(date_str, '%Y-%m-%d').date(),
             reason=reason,
             notes=notes
         )
         
-        db.session.add(exception)
+        db.session.add(exception_record)
         db.session.commit()
         
         return jsonify({'message': 'Exception recorded successfully'}), 201
@@ -330,7 +364,7 @@ def create_exception():
 def get_exceptions():
     try:
         user_id = int(get_jwt_identity())
-        exceptions = Exception.query.filter_by(user_id=user_id).order_by(Exception.date.desc()).all()
+        exceptions = ExceptionRecord.query.filter_by(user_id=user_id).order_by(ExceptionRecord.date.desc()).all()
         
         result = []
         for exc in exceptions:
@@ -346,7 +380,7 @@ def get_exceptions():
         print(f"Get exceptions error: {e}")
         return jsonify({'error': 'Failed to get exceptions'}), 500
 
-# QRコード生成 (既存機能を維持)
+# QRコード生成
 @app.route('/api/generate-qr', methods=['POST'])
 @jwt_required()
 def generate_qr():
@@ -401,16 +435,17 @@ def init_database():
         
         # デフォルトの科目を追加
         default_subjects = [
-            {'name': '数学', 'time': '9:00-10:30'},
-            {'name': '英語', 'time': '10:45-12:15'},
-            {'name': '物理', 'time': '13:15-14:45'},
-            {'name': '化学', 'time': '15:00-16:30'}
+            {'name': '数学', 'time': '9:00-10:30', 'description': '基礎数学'},
+            {'name': '英語', 'time': '10:45-12:15', 'description': '英語コミュニケーション'},
+            {'name': '物理', 'time': '13:15-14:45', 'description': '物理学基礎'},
+            {'name': '化学', 'time': '15:00-16:30', 'description': '化学実験'}
         ]
         
         for subject_data in default_subjects:
             subject = Subject(
                 subject_name=subject_data['name'],
-                attendance_time=subject_data['time']
+                attendance_time=subject_data['time'],
+                description=subject_data['description']
             )
             db.session.add(subject)
         
@@ -424,8 +459,13 @@ def init_database():
         return jsonify({'error': 'Database initialization failed'}), 500
 
 if __name__ == '__main__':
-    with app.app_context():
-        # 自動的にテーブルを作成（初回起動時）
-        db.create_all()
-        print("Database tables created successfully")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    try:
+        with app.app_context():
+            # 自動的にテーブルを作成（初回起動時）
+            db.create_all()
+            print("Database tables created successfully")
+        print("Starting Flask server...")
+        app.run(host='0.0.0.0', port=5000, debug=True)
+    except Exception as e:
+        print(f"Failed to start application: {e}")
+        print("Please check your dependencies and database configuration")
