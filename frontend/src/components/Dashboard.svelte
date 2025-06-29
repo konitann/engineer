@@ -10,77 +10,139 @@
   let qrData = '';
   let selectedDate = new Date().toISOString().split('T')[0];
   let attendances = [];
+  let subjects = [];
+  let exceptions = [];
   let message = '';
   let error = '';
+  
+  // フォーム用の変数
+  let selectedSubjectId = '';
+  let attendanceStatus = '出勤';
+  let attendanceTime = '';
+  let exceptionReason = '';
+  let exceptionNotes = '';
+  let exceptionDate = new Date().toISOString().split('T')[0];
+  
+  // 新しい科目追加用
+  let newSubjectName = '';
+  let newSubjectTime = '';
 
   onMount(() => {
+    loadSubjects();
     loadAttendance();
+    loadExceptions();
   });
 
-  async function generateQR() {
-    error = '';
-    message = '';
-    
+  async function initDatabase() {
     try {
-      console.log('Generating QR with date:', selectedDate);
-      console.log('Token exists:', !!token);
-      console.log('Token length:', token ? token.length : 0);
-      
-      const requestBody = { date: selectedDate };
-      console.log('Request body:', requestBody);
-      
-      const response = await fetch('http://localhost:5000/api/generate-qr', {
+      const response = await fetch('http://localhost:5000/api/init-db', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        message = 'データベースが初期化されました';
+        await loadSubjects();
+        await loadAttendance();
+        await loadExceptions();
+      } else {
+        error = data.error || 'データベース初期化に失敗しました';
+      }
+    } catch (err) {
+      console.error('Database init error:', err);
+      error = `接続に失敗しました: ${err.message}`;
+    }
+  }
+
+  async function loadSubjects() {
+    try {
+      const response = await fetch('http://localhost:5000/api/subjects', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        subjects = await response.json();
+      } else if (response.status === 401) {
+        logout();
+      } else {
+        console.error('Failed to load subjects:', response.status);
+      }
+    } catch (err) {
+      console.error('Failed to load subjects:', err);
+    }
+  }
+
+  async function createSubject() {
+    if (!newSubjectName) {
+      error = '科目名を入力してください';
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:5000/api/subjects', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({
+          name: newSubjectName,
+          attendance_time: newSubjectTime
+        })
       });
 
-      console.log('Response status:', response.status);
-
       const data = await response.json();
-      console.log('Response data:', data);
 
       if (response.ok) {
-        qrCode = data.qr_code;
-        qrData = data.data;
-        message = 'QR code generated successfully';
-      } else if (response.status === 401) {
-        error = 'セッションが期限切れです。再ログインしてください。';
-        setTimeout(() => {
-          logout();
-        }, 2000);
+        message = '科目が追加されました';
+        newSubjectName = '';
+        newSubjectTime = '';
+        loadSubjects();
       } else {
-        error = data.error || `QR generation failed (${response.status})`;
-        if (data.details) {
-          error += `: ${data.details}`;
-        }
+        error = data.error || '科目の追加に失敗しました';
       }
     } catch (err) {
-      console.error('QR generation error:', err);
-      error = `Connection failed: ${err.message}`;
+      console.error('Create subject error:', err);
+      error = `接続に失敗しました: ${err.message}`;
     }
   }
 
-  async function checkIn() {
+  async function recordAttendance() {
+    if (!selectedSubjectId) {
+      error = '科目を選択してください';
+      return;
+    }
+
     error = '';
     message = '';
     
     try {
-      const response = await fetch('http://localhost:5000/api/check-in', {
+      const response = await fetch('http://localhost:5000/api/attendance', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        }
+        },
+        body: JSON.stringify({
+          subject_id: selectedSubjectId,
+          date: selectedDate,
+          status: attendanceStatus,
+          time: attendanceTime
+        })
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        message = data.message;
+        message = '出勤記録が保存されました';
+        selectedSubjectId = '';
+        attendanceTime = '';
         loadAttendance();
       } else if (response.status === 401) {
         error = 'セッションが期限切れです。再ログインしてください。';
@@ -88,43 +150,11 @@
           logout();
         }, 2000);
       } else {
-        error = data.error || `Check-in failed (${response.status})`;
+        error = data.error || '出勤記録の保存に失敗しました';
       }
     } catch (err) {
-      console.error('Check-in error:', err);
-      error = `Connection failed: ${err.message}`;
-    }
-  }
-
-  async function checkOut() {
-    error = '';
-    message = '';
-    
-    try {
-      const response = await fetch('http://localhost:5000/api/check-out', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        message = data.message;
-        loadAttendance();
-      } else if (response.status === 401) {
-        error = 'セッションが期限切れです。再ログインしてください。';
-        setTimeout(() => {
-          logout();
-        }, 2000);
-      } else {
-        error = data.error || `Check-out failed (${response.status})`;
-      }
-    } catch (err) {
-      console.error('Check-out error:', err);
-      error = `Connection failed: ${err.message}`;
+      console.error('Record attendance error:', err);
+      error = `接続に失敗しました: ${err.message}`;
     }
   }
 
@@ -139,7 +169,6 @@
       if (response.ok) {
         attendances = await response.json();
       } else if (response.status === 401) {
-        console.log('Token expired, logging out...');
         logout();
       } else {
         console.error('Failed to load attendance:', response.status);
@@ -149,71 +178,624 @@
     }
   }
 
+  async function createException() {
+    if (!exceptionReason) {
+      error = '理由を入力してください';
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:5000/api/exceptions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          date: exceptionDate,
+          reason: exceptionReason,
+          notes: exceptionNotes
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        message = '例外記録が保存されました';
+        exceptionReason = '';
+        exceptionNotes = '';
+        exceptionDate = new Date().toISOString().split('T')[0];
+        loadExceptions();
+      } else {
+        error = data.error || '例外記録の保存に失敗しました';
+      }
+    } catch (err) {
+      console.error('Create exception error:', err);
+      error = `接続に失敗しました: ${err.message}`;
+    }
+  }
+
+  async function loadExceptions() {
+    try {
+      const response = await fetch('http://localhost:5000/api/exceptions', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        exceptions = await response.json();
+      } else if (response.status === 401) {
+        logout();
+      } else {
+        console.error('Failed to load exceptions:', response.status);
+      }
+    } catch (err) {
+      console.error('Failed to load exceptions:', err);
+    }
+  }
+
+  async function generateQR() {
+    error = '';
+    message = '';
+    
+    try {
+      const response = await fetch('http://localhost:5000/api/generate-qr', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ date: selectedDate }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        qrCode = data.qr_code;
+        qrData = data.data;
+        message = 'QRコードが生成されました';
+      } else if (response.status === 401) {
+        error = 'セッションが期限切れです。再ログインしてください。';
+        setTimeout(() => {
+          logout();
+        }, 2000);
+      } else {
+        error = data.error || 'QRコードの生成に失敗しました';
+      }
+    } catch (err) {
+      console.error('QR generation error:', err);
+      error = `接続に失敗しました: ${err.message}`;
+    }
+  }
+
   function logout() {
     dispatch('logout');
   }
+
+  function clearMessages() {
+    message = '';
+    error = '';
+  }
 </script>
 
-<div>
-  <h2>ダッシュボード</h2>
-  <p>ようこそ、{user.username}さん</p>
-  
-  <button on:click={logout}>ログアウト</button>
+<div class="dashboard">
+  <header>
+    <h2>ダッシュボード</h2>
+    <div class="user-info">
+      <p>ようこそ、{user.username}さん</p>
+      {#if user.company_dept_club}
+        <p class="company">{user.company_dept_club}</p>
+      {/if}
+    </div>
+    <button class="logout-btn" on:click={logout}>ログアウト</button>
+  </header>
   
   {#if message}
-    <div style="color: green; margin: 10px 0;">{message}</div>
+    <div class="message success">{message}</div>
   {/if}
   
   {#if error}
-    <div style="color: red; margin: 10px 0;">{error}</div>
+    <div class="message error">{error}</div>
   {/if}
 
-  <h3>QRコード生成</h3>
-  <div>
-    <label for="date">日付:</label>
-    <input
-      id="date"
-      type="date"
-      bind:value={selectedDate}
-    />
-    <button on:click={generateQR}>QRコード生成</button>
-  </div>
-  
-  {#if qrCode}
-    <div>
-      <h4>生成されたQRコード</h4>
-      <img src={qrCode} alt="QR Code" />
-      <p>データ: {qrData}</p>
+  <section class="init-section">
+    <h3>データベース管理</h3>
+    <button class="init-btn" on:click={initDatabase}>データベースを初期化</button>
+    <p class="warning">※ 既存のデータがすべて削除され、新しいデータベース構造で再作成されます</p>
+  </section>
+
+  <section class="subjects-section">
+    <h3>科目管理</h3>
+    
+    <div class="add-subject">
+      <h4>新しい科目を追加</h4>
+      <div class="form-row">
+        <input
+          type="text"
+          bind:value={newSubjectName}
+          placeholder="科目名"
+          on:focus={clearMessages}
+        />
+        <input
+          type="text"
+          bind:value={newSubjectTime}
+          placeholder="授業時間 (例: 9:00-10:30)"
+          on:focus={clearMessages}
+        />
+        <button on:click={createSubject}>追加</button>
+      </div>
     </div>
-  {/if}
 
-  <h3>勤怠管理</h3>
-  <div>
-    <button on:click={checkIn}>出勤</button>
-    <button on:click={checkOut}>退勤</button>
-  </div>
+    <div class="subjects-list">
+      <h4>登録済み科目</h4>
+      {#if subjects.length > 0}
+        <div class="subjects-grid">
+          {#each subjects as subject}
+            <div class="subject-card">
+              <h5>{subject.name}</h5>
+              <p>{subject.attendance_time}</p>
+            </div>
+          {/each}
+        </div>
+      {:else}
+        <p>科目が登録されていません</p>
+      {/if}
+    </div>
+  </section>
 
-  <h3>勤怠履歴</h3>
-  {#if attendances.length > 0}
-    <table border="1">
-      <thead>
-        <tr>
-          <th>日付</th>
-          <th>出勤時刻</th>
-          <th>退勤時刻</th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each attendances as attendance}
-          <tr>
-            <td>{attendance.date}</td>
-            <td>{attendance.check_in ? new Date(attendance.check_in).toLocaleString() : '-'}</td>
-            <td>{attendance.check_out ? new Date(attendance.check_out).toLocaleString() : '-'}</td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
-  {:else}
-    <p>勤怠履歴がありません</p>
-  {/if}
+  <section class="attendance-section">
+    <h3>出勤記録</h3>
+    
+    <div class="record-attendance">
+      <div class="form-row">
+        <label for="date">日付:</label>
+        <input
+          id="date"
+          type="date"
+          bind:value={selectedDate}
+          on:focus={clearMessages}
+        />
+      </div>
+      
+      <div class="form-row">
+        <label for="subject">科目:</label>
+        <select id="subject" bind:value={selectedSubjectId} on:focus={clearMessages}>
+          <option value="">科目を選択してください</option>
+          {#each subjects as subject}
+            <option value={subject.id}>{subject.name}</option>
+          {/each}
+        </select>
+      </div>
+      
+      <div class="form-row">
+        <label for="status">出勤状況:</label>
+        <select id="status" bind:value={attendanceStatus}>
+          <option value="出勤">出勤</option>
+          <option value="欠勤">欠勤</option>
+          <option value="遅刻">遅刻</option>
+          <option value="早退">早退</option>
+        </select>
+      </div>
+      
+      <div class="form-row">
+        <label for="time">時間:</label>
+        <input
+          id="time"
+          type="text"
+          bind:value={attendanceTime}
+          placeholder="例: 9:15-10:30"
+          on:focus={clearMessages}
+        />
+      </div>
+      
+      <button on:click={recordAttendance}>出勤記録を保存</button>
+    </div>
+  </section>
+
+  <section class="exception-section">
+    <h3>例外記録</h3>
+    
+    <div class="record-exception">
+      <div class="form-row">
+        <label for="exception-date">日付:</label>
+        <input
+          id="exception-date"
+          type="date"
+          bind:value={exceptionDate}
+          on:focus={clearMessages}
+        />
+      </div>
+      
+      <div class="form-row">
+        <label for="reason">理由:</label>
+        <input
+          id="reason"
+          type="text"
+          bind:value={exceptionReason}
+          placeholder="理由を入力してください"
+          on:focus={clearMessages}
+        />
+      </div>
+      
+      <div class="form-row">
+        <label for="notes">備考:</label>
+        <textarea
+          id="notes"
+          bind:value={exceptionNotes}
+          placeholder="詳細な説明があれば入力してください"
+          on:focus={clearMessages}
+        ></textarea>
+      </div>
+      
+      <button on:click={createException}>例外記録を保存</button>
+    </div>
+  </section>
+
+  <section class="qr-section">
+    <h3>QRコード生成</h3>
+    <div class="qr-generator">
+      <div class="form-row">
+        <label for="qr-date">日付:</label>
+        <input
+          id="qr-date"
+          type="date"
+          bind:value={selectedDate}
+          on:focus={clearMessages}
+        />
+        <button on:click={generateQR}>QRコード生成</button>
+      </div>
+      
+      {#if qrCode}
+        <div class="qr-result">
+          <h4>生成されたQRコード</h4>
+          <img src={qrCode} alt="QR Code" />
+          <p>データ: {qrData}</p>
+        </div>
+      {/if}
+    </div>
+  </section>
+
+  <section class="history-section">
+    <h3>履歴</h3>
+    
+    <div class="history-tabs">
+      <div class="tab-content">
+        <h4>出勤履歴</h4>
+        {#if attendances.length > 0}
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>日付</th>
+                  <th>科目</th>
+                  <th>出勤状況</th>
+                  <th>時間</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each attendances as attendance}
+                  <tr>
+                    <td>{attendance.date}</td>
+                    <td>{attendance.subject_name}</td>
+                    <td class="status-{attendance.status}">{attendance.status}</td>
+                    <td>{attendance.time || '-'}</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        {:else}
+          <p>出勤履歴がありません</p>
+        {/if}
+      </div>
+      
+      <div class="tab-content">
+        <h4>例外履歴</h4>
+        {#if exceptions.length > 0}
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>日付</th>
+                  <th>理由</th>
+                  <th>備考</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each exceptions as exception}
+                  <tr>
+                    <td>{exception.date}</td>
+                    <td>{exception.reason}</td>
+                    <td>{exception.notes || '-'}</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        {:else}
+          <p>例外履歴がありません</p>
+        {/if}
+      </div>
+    </div>
+  </section>
 </div>
+
+<style>
+  .dashboard {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #eee;
+  }
+
+  .user-info h2 {
+    margin: 0;
+    color: #333;
+  }
+
+  .user-info p {
+    margin: 5px 0;
+    color: #666;
+  }
+
+  .company {
+    font-style: italic;
+    color: #888;
+  }
+
+  .logout-btn {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .logout-btn:hover {
+    background-color: #c82333;
+  }
+
+  .message {
+    padding: 12px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+  }
+
+  .message.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+  }
+
+  .message.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+  }
+
+  section {
+    margin-bottom: 40px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+  }
+
+  h3 {
+    margin-top: 0;
+    color: #495057;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 10px;
+  }
+
+  h4 {
+    color: #6c757d;
+    margin-bottom: 15px;
+  }
+
+  .init-section {
+    background-color: #fff3cd;
+    border-color: #ffeaa7;
+  }
+
+  .init-btn {
+    background-color: #ffc107;
+    color: #212529;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+
+  .init-btn:hover {
+    background-color: #e0a800;
+  }
+
+  .warning {
+    margin-top: 10px;
+    color: #856404;
+    font-size: 14px;
+    font-style: italic;
+  }
+
+  .form-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+    gap: 10px;
+  }
+
+  .form-row label {
+    min-width: 80px;
+    font-weight: bold;
+    color: #495057;
+  }
+
+  .form-row input,
+  .form-row select,
+  .form-row textarea {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+
+  .form-row textarea {
+    min-height: 80px;
+    resize: vertical;
+  }
+
+  .form-row button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .form-row button:hover {
+    background-color: #0056b3;
+  }
+
+  .subjects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+  }
+
+  .subject-card {
+    background-color: white;
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .subject-card h5 {
+    margin: 0 0 8px 0;
+    color: #007bff;
+  }
+
+  .subject-card p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 14px;
+  }
+
+  .qr-result {
+    margin-top: 20px;
+    text-align: center;
+    background-color: white;
+    padding: 20px;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+  }
+
+  .qr-result img {
+    margin: 10px 0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+  }
+
+  .table-container {
+    background-color: white;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #dee2e6;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th,
+  td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #dee2e6;
+  }
+
+  th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+    color: #495057;
+  }
+
+  tr:hover {
+    background-color: #f5f5f5;
+  }
+
+  .status-出勤 {
+    color: #28a745;
+    font-weight: bold;
+  }
+
+  .status-欠勤 {
+    color: #dc3545;
+    font-weight: bold;
+  }
+
+  .status-遅刻 {
+    color: #ffc107;
+    font-weight: bold;
+  }
+
+  .status-早退 {
+    color: #fd7e14;
+    font-weight: bold;
+  }
+
+  .history-tabs {
+    margin-top: 20px;
+  }
+
+  .tab-content {
+    margin-bottom: 30px;
+  }
+
+  @media (max-width: 768px) {
+    .dashboard {
+      padding: 10px;
+    }
+
+    header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .form-row {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .form-row label {
+      min-width: auto;
+      margin-bottom: 5px;
+    }
+
+    .subjects-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .table-container {
+      overflow-x: auto;
+    }
+  }
+</style>
